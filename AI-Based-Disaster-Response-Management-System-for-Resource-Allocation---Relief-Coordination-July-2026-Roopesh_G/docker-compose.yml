@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reliefos-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://mongo:27017/reliefos
+      - MONGO_DB_NAME=reliefos
+      - JWT_SECRET=reliefos_jwt_super_secret_key_production_2026
+      - CLIENT_URL=http://localhost:5000
+      - CORS_ORIGIN=*
+      - DEMO_MODE=true
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - reliefos-network
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: reliefos-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - reliefos-network
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  reliefos-network:
+    driver: bridge

@@ -1,0 +1,174 @@
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        ansiColor('xterm')
+    }
+
+    parameters {
+        string(name: 'IMAGE_NAME', defaultValue: 'reliefos-app', description: 'Name of the Docker image')
+        string(name: 'DOCKER_REGISTRY', defaultValue: 'docker.io/your-username', description: 'Docker registry / Docker Hub username')
+        string(name: 'APP_PORT', defaultValue: '5000', description: 'Host port to map to container port 5000')
+        choice(name: 'DEPLOY_ENV', choices: ['staging', 'production', 'development'], description: 'Target Deployment Environment')
+        booleanParam(name: 'DEPLOY_LOCAL_CONTAINER', defaultValue: true, description: 'Run the newly built Docker container on this agent')
+    }
+
+    environment {
+        // Jenkins Credentials IDs configured in Jenkins > Manage Jenkins > Credentials
+        DOCKER_HUB_CREDENTIALS_ID = 'docker-hub-credentials'
+        MONGO_URI_CREDENTIAL_ID   = 'reliefos-mongo-uri'
+        JWT_SECRET_CREDENTIAL_ID  = 'reliefos-jwt-secret'
+        -
+        IMAGE_TAG = "${params.IMAGE_NAME}:${env.BUILD_NUMBER}"
+        IMAGE_LATEST = "${params.IMAGE_NAME}:
+        REMOTE_TAG = "${params.DOCKER_REGISTRY}/${params.IMAGE_NAME}:${env.BUILD_NUMBER}"
+        REMOTE_LATEST = "${params.DOCKER_REGISTRY}/${params.IMAGE_NAME}:latest"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "===> Checking out source code..."
+                checkout scm
+            }
+        }
+
+        stage('Validate & Verify') {
+            steps {
+                echo "===> Verifying toolchain and build requirements..."
+                sh '''
+                    echo "Docker Version:"
+                    docker --version
+                    echo "Docker Compose Version:"
+                    docker compose version || true
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "===> Building single unified Docker image: ${IMAGE_TAG}..."
+                sh """
+                    docker build \
+                        --no-cache \
+                        --tag ${IMAGE_TAG} \
+                        --tag ${IMAGE_LATEST} \
+                        --tag ${REMOTE_TAG} \
+                        --tag ${REMOTE_LATEST} \
+                        -f Dockerfile .
+                """
+            }
+        }
+
+        stage('Image Security Scan') {
+            steps {
+                echo "===> Scanning Docker image for critical vulnerabilities (if Trivy is available)..."
+                sh '''
+                    if command -v trivy >/dev/null 2>&1; then
+                        trivy image --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_LATEST}
+                    else
+                        echo "Trivy scanner not found on agent, skipping image vulnerability scan."
+                    fi
+                '''
+            }
+        }
+
+        stage('Push to Registry') {
+            when {
+                expression {
+                    return params.DOCKER_REGISTRY != '' && !params.DOCKER_REGISTRY.contains('your-username')
+                }
+            }
+            steps {
+                echo "===> Logging into Docker Registry and pushing images..."
+                withCredentials([usernamePassword(
+                    credentialsId: env.DOCKER_HUB_CREDENTIALS_ID,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+                        docker push ${REMOTE_TAG}
+                        docker push ${REMOTE_LATEST}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            when {
+                expression { return params.DEPLOY_LOCAL_CONTAINER }
+            }
+            steps {
+                echo "===> Deploying ReliefOS Container on port ${params.APP_PORT}..."
+                script {
+                    // Inject secrets if configured in Jenkins, otherwise fallback to defaults for testing
+                    withCredentials([
+                        string(credentialsId: env.MONGO_URI_CREDENTIAL_ID, variable: 'APP_MONGO_URI'),
+                        string(credentialsId: env.JWT_SECRET_CREDENTIAL_ID, variable: 'APP_JWT_SECRET')
+                    ]) {
+                        sh """
+                            # Stop and remove any existing container
+                            docker stop ${params.IMAGE_NAME} || true
+                            docker rm ${params.IMAGE_NAME} || true
+
+                            # Run the new container
+                            docker run -d \
+                                --name ${params.IMAGE_NAME} \
+                                --restart unless-stopped \
+                                -p ${params.APP_PORT}:5000 \
+                                -e NODE_ENV=production \
+                                -e PORT=5000 \
+                                -e MONGO_URI="\$APP_MONGO_URI" \
+                                -e JWT_SECRET="\$APP_JWT_SECRET" \
+                                -e DEMO_MODE=true \
+                                -e CORS_ORIGIN=* \
+                                ${IMAGE_LATEST}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Healthcheck & Smoke Test') {
+            when {
+                expression { return params.DEPLOY_LOCAL_CONTAINER }
+            }
+            steps {
+                echo "===> Verifying container health on http://localhost:${params.APP_PORT}/api/health..."
+                sh """
+                    sleep 5
+                    for i in 1 2 3 4 5; do
+                        if curl -f -s http://localhost:${params.APP_PORT}/api/health | grep -q 'ok'; then
+                            echo "✅ Health check passed! ReliefOS is live and healthy."
+                            exit 0
+                        fi
+                        echo "Waiting for container startup... (\$i/5)"
+                        sleep 3
+                    done
+                    echo "⚠️ Health check endpoint did not return 200 within timeout."
+                    docker logs --tail 50 ${params.IMAGE_NAME}
+                    exit 1
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "===> Cleaning up dangling build images..."
+            sh 'docker image prune -f || true'
+        }
+        success {
+            echo "=========================================================="
+            echo "🎉 Pipeline succeeded! ReliefOS deployed successfully."
+            echo "   Access application at: http://<agent-ip>:${params.APP_PORT}"
+            echo "=========================================================="
+        }
+        failure {
+            echo "❌ Pipeline failed. Check console log above for details."
+        }
+    }
+}
