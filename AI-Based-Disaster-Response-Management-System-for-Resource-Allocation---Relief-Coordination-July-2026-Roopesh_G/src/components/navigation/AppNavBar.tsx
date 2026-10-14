@@ -5,6 +5,7 @@ import { Shield, X, Menu, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const navLinks = [
+  { path: '/operations-dashboard', label: 'Operations & Logistics' },
   { path: '/crisis-map',   label: 'Crisis Map' },
   { path: '/global-crisis',label: 'Global Intel' },
   { path: '/resources',    label: 'Resources' },
@@ -62,6 +63,8 @@ export function AppNavBar() {
   const { user, doLogout } = useAuth();
   
   const isLanding = location.pathname === '/' || location.pathname === '/landing';
+  const isDarkPage = ['/resources', '/supply-chain'].includes(location.pathname);
+  const textColor = isDarkPage ? 'text-white' : 'text-black';
 
   // Lock body scroll when menu is open
   useEffect(() => {
@@ -80,11 +83,11 @@ export function AppNavBar() {
 
   return (
     <>
-      {/* Sleek Transparent Header (Lacoste Style) */}
-      <header className="fixed top-0 left-0 right-0 z-[700] px-6 py-5 flex items-center justify-between pointer-events-none mix-blend-difference text-white">
+      {/* Transparent Header */}
+      <header className={`fixed top-0 left-0 right-0 z-[9999] px-6 py-5 flex items-center justify-between pointer-events-auto bg-transparent ${textColor}`}>
         
         {/* Left: Logo & Back */}
-        <div className="flex items-center gap-6 pointer-events-auto">
+        <div className="flex items-center gap-6">
           {!isLanding && (
             <button
               type="button"
@@ -109,7 +112,7 @@ export function AppNavBar() {
         </div>
 
         {/* Right: Menu Toggle */}
-        <div className="pointer-events-auto">
+        <div>
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -129,7 +132,7 @@ export function AppNavBar() {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="fixed inset-0 z-[900] bg-[#0A1118]/95 backdrop-blur-2xl flex flex-col px-6 md:px-20 py-10 overflow-hidden text-white"
+            className="fixed inset-0 z-[10000] bg-[#ebe6e0]/95 backdrop-blur-2xl flex flex-col px-6 md:px-20 py-10 overflow-y-auto text-black"
           >
             {/* Header inside menu */}
             <div className="flex items-center justify-between">
@@ -150,7 +153,7 @@ export function AppNavBar() {
             </div>
 
             {/* Menu Links */}
-            <div className="flex-1 flex flex-col justify-center gap-6 md:gap-8 mt-12">
+            <div className="flex-1 flex flex-col justify-start gap-6 md:gap-8 mt-12 mb-8">
               {navLinks.map((item, index) => {
                 const active = location.pathname === item.path;
                 return (
@@ -164,7 +167,7 @@ export function AppNavBar() {
                         0{index + 1}
                       </span>
                       <span className={`font-display text-4xl md:text-6xl font-medium tracking-wide uppercase transition-all duration-500 ease-out 
-                        ${active ? 'text-white' : 'text-white/60 group-hover:text-white group-hover:translate-x-4'}`}
+                        ${active ? 'text-black' : 'text-black/50 group-hover:text-black group-hover:translate-x-4'}`}
                       >
                         {item.label}
                       </span>
@@ -177,7 +180,7 @@ export function AppNavBar() {
             {/* Footer inside menu */}
             <motion.div 
               variants={linkVariants}
-              className="mt-auto border-t border-white/10 pt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 font-sans text-xs uppercase tracking-[0.2em] font-semibold text-white/50"
+              className="mt-auto border-t border-black/10 pt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 font-sans text-xs uppercase tracking-[0.2em] font-semibold text-black/50"
             >
               <div>
                 {user ? `Logged in as ${user.email}` : 'Not logged in'}
@@ -187,7 +190,7 @@ export function AppNavBar() {
                 <button
                   type="button"
                   onClick={() => { doLogout(); setOpen(false); }}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="hover:text-black transition-colors cursor-pointer"
                 >
                   Sign Out
                 </button>

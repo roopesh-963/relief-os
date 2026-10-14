@@ -401,6 +401,96 @@ const getResourceAnalytics = async (_req, res) => {
   }
 };
 
+const autoAllocateResources = async (req, res) => {
+  try {
+    // 1. Fetch available resources
+    const resources = await Resource.find({ quantity: { $gt: 0 } });
+    
+    // 2. Fetch pending SOS requests (zones)
+    const SOSModel = require('../models/SOS.model');
+    const pendingSOS = await SOSModel.find({ status: { $in: ['pending', 'acknowledged'] } });
+
+    if (!resources.length || !pendingSOS.length) {
+      return res.status(400).json({ message: 'Not enough resources or pending zones for allocation.' });
+    }
+
+    // 3. Format payload for Python OR-Tools
+    const payload = {
+      resources: resources.map(r => ({
+        id: String(r._id),
+        quantity: r.quantity,
+        type: r.type,
+        location: r.location
+      })),
+      zones: pendingSOS.map(sos => {
+        let severityScore = 50;
+        if (sos.severity === 'critical') severityScore = 95;
+        if (sos.severity === 'high') severityScore = 80;
+        if (sos.severity === 'medium') severityScore = 60;
+        if (sos.severity === 'low') severityScore = 40;
+        
+        return {
+          id: String(sos._id),
+          demand: 100, // Hardcoded demand for demo purposes, could be derived from sos.crisisType
+          severity_score: severityScore,
+          type: 'Medicine' // Simplified: we should ideally match Resource.type to SOS needs
+        };
+      })
+    };
+
+    // 4. Call Python OR-Tools Engine
+    const mlResponse = await fetch('http://localhost:8000/api/ml/allocate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!mlResponse.ok) {
+      throw new Error(`Python Engine returned ${mlResponse.status}`);
+    }
+
+    const mlData = await mlResponse.json();
+    const allocations = mlData.data?.allocations || [];
+
+    const results = [];
+    
+    // 5. Apply allocations to MongoDB
+    for (const alloc of allocations) {
+      const resource = await Resource.findById(alloc.resource_id);
+      if (resource && resource.quantity >= alloc.allocated_quantity) {
+        resource.quantity -= alloc.allocated_quantity;
+        resource.isDeployed = true;
+        resource.deploymentTarget = `Zone ${alloc.zone_id}`;
+        resource.allocations.push({
+          target: `Zone ${alloc.zone_id}`,
+          quantity: alloc.allocated_quantity,
+          notes: 'Auto-allocated by OR-Tools',
+          allocatedBy: req.user?._id || null,
+          allocatedAt: new Date(),
+        });
+        resource.status = deriveStatusFromQuantity(resource.quantity);
+        resource.lastUpdated = new Date();
+        resource.lastChecked = new Date();
+        await resource.save();
+        
+        results.push({
+          resource: resource.name,
+          target: `Zone ${alloc.zone_id}`,
+          quantity: alloc.allocated_quantity
+        });
+        
+        const eventPayload = formatResource(resource);
+        req.io.to('dashboard').emit('resource_updated', eventPayload);
+      }
+    }
+
+    res.status(200).json({ message: 'Auto-allocation complete', results });
+  } catch (error) {
+    console.error('Auto allocate error:', error);
+    res.status(500).json({ message: 'Server error during auto-allocation' });
+  }
+};
+
 module.exports = {
   getResources,
   addResource,
@@ -409,4 +499,5 @@ module.exports = {
   deployResource,
   allocateResource,
   getResourceAnalytics,
+  autoAllocateResources,
 };

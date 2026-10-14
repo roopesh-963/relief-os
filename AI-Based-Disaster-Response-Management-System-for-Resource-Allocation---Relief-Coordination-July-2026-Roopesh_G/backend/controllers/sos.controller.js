@@ -68,6 +68,35 @@ const submitSOS = async (req, res) => {
     const normalizedRegion = String(region || locationLabel || '').trim();
     const normalizedCrisisType = inferCrisisType({ crisisType, message, locationLabel: normalizedRegion });
 
+    // Fetch ML Severity Score
+    let mlSeverity = severity || 'high';
+    try {
+      const mlResponse = await fetch('http://localhost:8000/api/ml/severity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{
+          id: 'temp',
+          magnitude: 7.0, // Default for now, ideally parsed from message/external
+          population_density: 1500,
+          infrastructure_vulnerability: 0.8,
+          type: normalizedCrisisType
+        }])
+      });
+      
+      if (mlResponse.ok) {
+        const mlData = await mlResponse.json();
+        if (mlData.data && mlData.data.length > 0) {
+          const mlScore = mlData.data[0].zone_class;
+          // Map ML output (Critical, High, Medium, Low) to DB enum (critical, high, medium, low)
+          if (['critical', 'high', 'medium', 'low'].includes(mlScore.toLowerCase())) {
+            mlSeverity = mlScore.toLowerCase();
+          }
+        }
+      }
+    } catch (mlErr) {
+      console.warn('Python ML Engine not reachable, falling back to default severity.', mlErr.message);
+    }
+
     const sos = await SOS.create({
       submittedBy: req.user._id,
       location: {
@@ -75,7 +104,7 @@ const submitSOS = async (req, res) => {
         coordinates: [parseFloat(longitude), parseFloat(latitude)], // GeoJSON: lng first
         label: locationLabel || '',
       },
-      severity: severity || 'high',
+      severity: mlSeverity,
       crisisType: normalizedCrisisType,
       region: normalizedRegion,
       message: message || '',

@@ -11,6 +11,17 @@ const STATUS_PROGRESS = {
   Delivered: 100,
 };
 const LOCATION_COORDS = {
+  // ── Unified Strategic Disaster Depots & Camps ──────────────────
+  'Depot A (Northern Strategic Hub)':    { lat: 11.6854, lng: 76.1320 },
+  'Depot B (Forward Staging Center)':     { lat: 11.5900, lng: 76.0800 },
+  'Depot C (Southern Reserve Depot)':     { lat: 11.4500, lng: 76.2200 },
+  'Central Logistics Hub':               { lat: 28.6139, lng: 77.2090 },
+  'Zone A (Meppadi Emergency Camp)':     { lat: 11.5564, lng: 76.1320 },
+  'Zone B (Chooralmala Disaster Sector)': { lat: 11.5320, lng: 76.1750 },
+  'Zone C (Mundakkai Cut-off Outpost)':  { lat: 11.5180, lng: 76.2100 },
+  'Vythiri Hill Outpost':                { lat: 11.6050, lng: 76.0250 },
+  'Sulthan Bathery Evacuation Staging Hub': { lat: 11.6854, lng: 76.1320 },
+
   // ── India (original hubs) ──────────────────────────────────────
   'Central Hub':       { lat: 28.6139,  lng: 77.2090 },
   'East Depot':        { lat: 28.7041,  lng: 77.1025 },
@@ -268,14 +279,14 @@ const collectWarehouseStock = (resources) => {
 
   resources.forEach((resourceDoc) => {
     const resource = typeof resourceDoc.toObject === 'function' ? resourceDoc.toObject() : resourceDoc;
-    const name = resource.location || 'Central Hub';
+    const name = resource.location || 'Central Logistics Hub';
     const key = toWarehouseKey(name);
     const existing = warehouses.get(key) || {
       id: `wh-${key.replace(/[^a-z0-9]+/g, '-')}`,
       name,
       location: resolveCoords(name),
-      stockLevels: { Water: 0, Food: 0, Medicine: 0, Fuel: 0, Blankets: 0 },
-      capacity: 1200,
+      stockLevels: { Water: 0, Food: 0, Medicine: 0, Fuel: 0, Blankets: 0, Ambulance: 0 },
+      capacity: 35000,
       usedCapacity: 0,
       lowStockWarnings: [],
       lastUpdated: resource.updatedAt || resource.lastUpdated || new Date(),
@@ -285,6 +296,8 @@ const collectWarehouseStock = (resources) => {
     const normalizedType = resource.type === 'Equipment' ? 'Blankets' : resource.type;
     if (Object.prototype.hasOwnProperty.call(existing.stockLevels, normalizedType)) {
       existing.stockLevels[normalizedType] += Number(resource.quantity || 0);
+    } else {
+      existing.stockLevels[normalizedType] = Number(resource.quantity || 0);
     }
 
     const updatedAt = new Date(resource.updatedAt || resource.lastUpdated || Date.now());
@@ -297,13 +310,16 @@ const collectWarehouseStock = (resources) => {
 
   return Array.from(warehouses.values())
     .map((warehouse) => {
-      const fillPercent = Math.min(100, Math.max(0, Math.round((warehouse.usedCapacity / warehouse.capacity) * 100)));
+      // Dynamic capacity calculation to maintain realistic 60-85% fill rate
+      const cap = Math.max(warehouse.capacity, Math.ceil(warehouse.usedCapacity * 1.25 / 1000) * 1000);
+      const fillPercent = Math.min(100, Math.max(0, Math.round((warehouse.usedCapacity / cap) * 100)));
       const lowStockWarnings = Object.entries(warehouse.stockLevels)
-        .filter(([, value]) => Number(value) <= 120)
+        .filter(([type, value]) => Number(value) > 0 && Number(value) <= 120 && type !== 'Ambulance')
         .map(([type, value]) => `${type} at ${value} units`);
 
       return {
         ...warehouse,
+        capacity: cap,
         fillPercent,
         lowStockWarnings,
       };
@@ -462,19 +478,22 @@ const getWarehouses = async (_req, res) => {
     const resources = await Resource.find().sort({ updatedAt: -1 });
     const dbWarehouses = collectWarehouseStock(resources);
 
-    // Merge: DB warehouses override static if same name, otherwise add static
+    // Active DB warehouses with live inventory come FIRST
     const dbByName = new Map(dbWarehouses.map(w => [w.name.trim().toLowerCase(), w]));
-    const merged = GLOBAL_WAREHOUSES.map(gw => {
-      const db = dbByName.get(gw.name.trim().toLowerCase());
-      return db
-        ? { ...db, region: gw.region }
-        : { ...gw, stockLevels: { Water: 0, Food: 0, Medicine: 0, Fuel: 0, Blankets: 0 }, usedCapacity: 0, fillPercent: 0, lowStockWarnings: [], lastUpdated: new Date().toISOString() };
-    });
+    const merged = [...dbWarehouses];
 
-    // Add any DB warehouses not in global list
-    dbWarehouses.forEach(db => {
-      const known = GLOBAL_WAREHOUSES.some(g => g.name.trim().toLowerCase() === db.name.trim().toLowerCase());
-      if (!known) merged.push({ ...db, region: 'Local' });
+    // Append global warehouses if not already present
+    GLOBAL_WAREHOUSES.forEach(gw => {
+      if (!dbByName.has(gw.name.trim().toLowerCase())) {
+        merged.push({
+          ...gw,
+          stockLevels: { Water: 0, Food: 0, Medicine: 0, Fuel: 0, Blankets: 0, Ambulance: 0 },
+          usedCapacity: 0,
+          fillPercent: 0,
+          lowStockWarnings: [],
+          lastUpdated: new Date().toISOString()
+        });
+      }
     });
 
     res.json(merged);

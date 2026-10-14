@@ -37,7 +37,7 @@ export function CravTextAnimate({
     }
   };
 
-  const container = {
+  const container: any = {
     hidden: { opacity: 0 },
     visible: (i = 1) => ({
       opacity: 1,
@@ -45,7 +45,7 @@ export function CravTextAnimate({
     }),
   };
 
-  const child = {
+  const child: any = {
     visible: {
       opacity: 1,
       y: 0,

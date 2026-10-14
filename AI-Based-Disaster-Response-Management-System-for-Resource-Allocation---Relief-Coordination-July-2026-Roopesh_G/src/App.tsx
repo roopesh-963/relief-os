@@ -19,6 +19,7 @@ const Analytics = lazy(() => import('./pages/Analytics'));
 const SupplyChain = lazy(() => import('./pages/SupplyChain'));
 const AIAssistant = lazy(() => import('./pages/AIAssistant'));
 const GlobalCrisisDashboard = lazy(() => import('./pages/GlobalCrisisDashboard'));
+const DisasterOperationsDashboard = lazy(() => import('./pages/DisasterOperationsDashboard'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const OperationsCopilot = lazy(() => import('./components/assistant/OperationsCopilot'));
@@ -40,17 +41,21 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/landing" element={<Landing />} />
 
-              <Route path="/dashboard" element={<Navigate to="/crisis-map" replace />} />
+              <Route path="/dashboard" element={<ProtectedRoute><DisasterOperationsDashboard /></ProtectedRoute>} />
+              <Route path="/operations-dashboard" element={<ProtectedRoute><DisasterOperationsDashboard /></ProtectedRoute>} />
+              <Route path="/logistics-planning" element={<ProtectedRoute><DisasterOperationsDashboard /></ProtectedRoute>} />
+              <Route path="/milestone3" element={<ProtectedRoute><DisasterOperationsDashboard /></ProtectedRoute>} />
               <Route path="/global-crisis" element={<ProtectedRoute><GlobalCrisisDashboard /></ProtectedRoute>} />
               <Route path="/crisis-map" element={<ProtectedRoute><CrisisMap /></ProtectedRoute>} />
-              <Route path="/resources" element={<ProtectedRoute allowedRoles={['admin', 'rescue_team']}><Resources /></ProtectedRoute>} />
+              <Route path="/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
               <Route path="/sos-citizen" element={<ProtectedRoute><SOSApp /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute allowedRoles={['admin', 'rescue_team']}><Analytics /></ProtectedRoute>} />
-              <Route path="/supply-chain" element={<ProtectedRoute allowedRoles={['admin', 'rescue_team']}><SupplyChain /></ProtectedRoute>} />
-              <Route path="/ai-assistant" element={<ProtectedRoute allowedRoles={['admin', 'rescue_team']}><AIAssistant /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/supply-chain" element={<ProtectedRoute><SupplyChain /></ProtectedRoute>} />
+              <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
 
+              <Route path="/operations" element={<Navigate to="/operations-dashboard" replace />} />
               <Route path="/map" element={<Navigate to="/crisis-map" replace />} />
               <Route path="/sos" element={<Navigate to="/sos-citizen" replace />} />
               <Route path="/supply" element={<Navigate to="/supply-chain" replace />} />

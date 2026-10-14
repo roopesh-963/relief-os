@@ -105,7 +105,14 @@ export default function CrisisMap() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#030712] text-white">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#ebe6e0] text-black selection:bg-black selection:text-[#ebe6e0] transition-colors duration-700 noise">
+      {/* ── Liquid Ambient Background ── */}
+      <div className="liquid-bg-container pointer-events-none">
+        <div className="liquid-blob b1"></div>
+        <div className="liquid-blob b2"></div>
+        <div className="liquid-blob b3"></div>
+      </div>
+
       {/* Top Floating App Navbar */}
       <AppNavBar />
 
@@ -125,12 +132,13 @@ export default function CrisisMap() {
       />
 
       {/* ── Fullscreen 3D Google Earth Style Interactive Crisis Globe ── */}
-      <main className="w-full h-full">
+      <main className="w-full h-full relative z-10">
         <GoogleEarthCrisisGlobe
           markers={filteredMarkers}
           selectedMarkerId={selectedMarkerId}
           onMarkerSelect={handleMarkerSelect}
           isDetailsOpen={Boolean(selectedMarker)}
+          transparentBackground={true}
         />
       </main>
     </div>

@@ -3,8 +3,8 @@ import { ArrowRight, MessageSquare, User, Folder, Mail } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import {
   ChatMessage,
-  sendAssistantChatMessage,
 } from '../../services/api';
+import { GoogleGenAI } from '@google/genai';
 
 interface OperationsCopilotProps {
   embedded?: boolean;
@@ -22,6 +22,14 @@ export default function OperationsCopilot({ embedded }: OperationsCopilotProps) 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    const handlePromptEvent = (e: any) => {
+      setInputValue(e.detail);
+    };
+    window.addEventListener('ai-assistant-prompt', handlePromptEvent);
+    return () => window.removeEventListener('ai-assistant-prompt', handlePromptEvent);
+  }, []);
+
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() || isLoading) return;
@@ -32,23 +40,38 @@ export default function OperationsCopilot({ embedded }: OperationsCopilotProps) 
     setIsLoading(true);
 
     try {
-      const payloadMessages = [...messages, userMsg].map(m => ({
-        role: m.role,
-        text: m.text
-      }));
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('MISSING_API_KEY');
+      }
       
-      const res = await sendAssistantChatMessage({
-        messages: payloadMessages,
+      const ai = new GoogleGenAI({ apiKey });
+      
+      // Combine history into a single prompt for simple context (since role formatting varies by SDK version)
+      const promptContext = messages
+        .filter(m => m.text)
+        .map(m => `${m.role === 'assistant' ? 'Mira' : 'Guest'}: ${m.text}`)
+        .join('\n');
+        
+      const fullPrompt = `${promptContext}\nGuest: ${userMsg.text}\nMira: `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt,
       });
 
-      const text = res.response?.text || res.message || "No response generated.";
+      const text = response.text || "No response generated.";
       const aiMsg: ChatMessage = { role: 'assistant', text };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      let errMsg = `Connection failed. Error: ${err.message || String(err)}`;
+      if (err.message === 'MISSING_API_KEY') {
+        errMsg = 'Error: Please set VITE_GEMINI_API_KEY in your .env file to connect to Gemini.';
+      }
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', text: 'Connection failed. Please check network telemetry.' },
+        { role: 'assistant', text: errMsg },
       ]);
     } finally {
       setIsLoading(false);
@@ -57,8 +80,8 @@ export default function OperationsCopilot({ embedded }: OperationsCopilotProps) 
 
   return (
     <div className={cn(
-      "relative flex items-center justify-center bg-[#c8cfd5] overflow-hidden selection:bg-[#e45b36] selection:text-white font-mono",
-      embedded ? "h-full w-full" : "h-screen w-screen"
+      "relative flex items-center justify-center overflow-hidden selection:bg-[#e45b36] selection:text-white font-mono",
+      embedded ? "h-full w-full bg-transparent" : "h-screen w-screen bg-[#c8cfd5]"
     )}>
       
 

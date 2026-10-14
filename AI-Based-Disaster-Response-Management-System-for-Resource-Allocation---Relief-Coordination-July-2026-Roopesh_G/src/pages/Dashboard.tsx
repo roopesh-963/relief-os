@@ -23,6 +23,7 @@ import { logout } from '../services/api';
 import { CravTextAnimate } from '../components/CravTextAnimate';
 
 const navItems = [
+  { title: 'Operations & Logistics',  path: '/operations-dashboard', icon: Shield,   bg: 'bg-cyan-500' },
   { title: 'Tactical Crisis Map',     path: '/crisis-map',    icon: MapIcon,  bg: 'bg-[var(--color-crav-mustard)]' },
   { title: 'Global Crisis Intel',     path: '/global-crisis', icon: Globe2,   bg: 'bg-[var(--color-crav-orange)]' },
   { title: 'Resource Allocation',     path: '/resources',     icon: Package,  bg: 'bg-[var(--color-crav-green)]' },

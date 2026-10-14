@@ -1,5 +1,6 @@
 services:
   app:
+    image: reliefos-app:latest
     build:
       context: .
       dockerfile: Dockerfile

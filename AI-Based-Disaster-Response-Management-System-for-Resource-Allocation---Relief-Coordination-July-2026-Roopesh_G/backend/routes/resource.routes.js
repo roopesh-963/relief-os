@@ -20,6 +20,7 @@ const {
   deployResource,
   allocateResource,
   getResourceAnalytics,
+  autoAllocateResources,
 } = require('../controllers/resource.controller');
 const { protect, protectOrAllowDemo, authorize } = require('../middleware/auth.middleware');
 // Read access stays public in demo mode, but requires an authenticated ops role otherwise.
@@ -30,6 +31,7 @@ router.get('/analytics', protectOrAllowDemo('admin', 'rescue_team'), getResource
 router.post('/', protect, authorize('admin'), addResource);
 router.delete('/:id', protect, authorize('admin'), deleteResource);
 router.post('/allocate', protect, authorize('admin', 'rescue_team'), allocateResource);
+router.post('/auto-allocate', protect, authorize('admin', 'rescue_team'), autoAllocateResources);
 
 // Update and deployment operations
 router.put('/:id', protect, authorize('admin', 'rescue_team'), updateResource);

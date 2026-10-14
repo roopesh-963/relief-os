@@ -689,7 +689,7 @@ export default function Landing() {
           {/* Persistent Sticky Globe */}
           <motion.div
             animate={{
-              x: scene === 1 ? '25vw' : scene === 2 ? '-25vw' : scene === 3 ? '25vw' : scene === 4 ? '-25vw' : '0vw',
+              x: scene === 1 ? '25vw' : scene === 2 ? '-25vw' : scene === 3 ? '25vw' : scene === 4 ? '-25vw' : '-9vw',
               scale: scene === 0 ? 1 : 0.85
             }}
             transition={{ type: 'spring', damping: 20, stiffness: 60, mass: 1 }}
@@ -715,7 +715,7 @@ export default function Landing() {
               </div>
               <div className="relative flex items-center justify-center z-30 shrink-0" style={{ width: 'clamp(280px, 45vw, 650px)' }}></div>
               <div className="relative flex flex-1 items-center justify-start z-20 pointer-events-none mix-blend-multiply">
-                <span className="font-serif tracking-tighter text-[clamp(6rem,18vw,24rem)] leading-none text-black/90" style={{ marginLeft: '-2vw' }}>
+                <span className="font-serif tracking-tighter text-[clamp(6rem,18vw,24rem)] leading-none text-black/90" style={{ marginLeft: '2vw' }}>
                   RLD
                 </span>
               </div>

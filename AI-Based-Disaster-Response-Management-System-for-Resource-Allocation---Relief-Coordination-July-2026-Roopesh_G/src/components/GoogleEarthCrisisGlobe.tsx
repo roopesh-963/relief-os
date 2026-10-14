@@ -107,6 +107,7 @@ function EarthScene({
   isDetailsOpen,
   isAutoRotate,
   rotationSpeed,
+  transparentBackground,
 }: GoogleEarthCrisisGlobeProps & {
   isAutoRotate: boolean;
   rotationSpeed: number;
@@ -188,7 +189,9 @@ function EarthScene({
       <pointLight intensity={1.5} color="#38bdf8" position={[0, 8, 2]} />
 
       {/* Cosmic Starfield */}
-      <Stars radius={80} depth={50} count={2500} factor={3.5} saturation={0.3} fade speed={0.4} />
+      {!transparentBackground && (
+        <Stars radius={80} depth={50} count={2500} factor={3.5} saturation={0.3} fade speed={0.4} />
+      )}
 
       {/* ── Rotating Globe Container (Moves right when details open) ── */}
       <group ref={globeGroupRef} position={[targetX, 0, 0]}>
@@ -300,6 +303,7 @@ export function GoogleEarthCrisisGlobe(props: GoogleEarthCrisisGlobeProps) {
         dpr={[1, 2]}
         gl={{
           antialias: true,
+          alpha: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.4,
         }}

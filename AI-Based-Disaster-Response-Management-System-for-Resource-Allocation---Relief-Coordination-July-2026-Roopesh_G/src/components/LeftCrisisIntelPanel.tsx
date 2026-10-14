@@ -35,7 +35,7 @@ interface LeftCrisisIntelPanelProps {
 }
 
 // Framer Motion Variants for Lacoste-style staggered entrance
-const panelVariants = {
+const panelVariants: any = {
   hidden: { x: '-120%', opacity: 0 },
   visible: { 
     x: '0%', 
@@ -60,7 +60,7 @@ const panelVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: any = {
   hidden: { y: 30, opacity: 0 },
   visible: { 
     y: 0, 
@@ -68,7 +68,7 @@ const itemVariants = {
     transition: { duration: 0.6, ease: [0.33, 1, 0.68, 1] } 
   },
   exit: { 
-    y: 15, 
+    y: 20, 
     opacity: 0, 
     transition: { duration: 0.3 } 
   }

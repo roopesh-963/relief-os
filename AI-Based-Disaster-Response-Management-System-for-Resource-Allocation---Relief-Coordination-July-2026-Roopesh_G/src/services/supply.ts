@@ -16,6 +16,7 @@ export type ShipmentDestinationType = 'Warehouse' | 'Shelter' | 'Camp' | 'Clinic
 
 export interface Shipment {
   _id: string;
+  id?: string;
   shipmentId: string;
   resourceType: ShipmentResourceType;
   quantity: number;
